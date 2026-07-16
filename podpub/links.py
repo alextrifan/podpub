@@ -15,6 +15,9 @@ def resolve_links(published: dict, config: Config) -> dict:
         links["Transistor"] = published["transistor_url"]
     if published.get("youtube_url"):
         links["YouTube"] = published["youtube_url"]
+    show_id = config.get("show", "transistor_show_id", default="")
+    if show_id:
+        links["RSS"] = f"https://feeds.transistor.fm/{show_id}"
 
     # TODO: спробувати дістати deep links епізоду з Transistor distribution API.
     #       Якщо ще не резолвиться — використати show-level посилання з config.platforms.
