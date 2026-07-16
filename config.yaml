@@ -1,0 +1,44 @@
+show:
+  transistor_show_id: "107abf31-df30-4d23-b609-8a2b9633094f"                 # TODO: ID шоу в Transistor (один фід, обидві серії)
+  language: "uk"
+  series:                                # умовні назви серій в межах одного фіду; обирається через --series
+    dicepunk: "Dicepunk"
+    d2didiv: "d2 Дідів"
+
+video:
+  resolution: "1920x1080"
+  fps: 30
+  waveform_mode: "cline"                 # cline | line | p2p
+  waveform_colors: "0xE0E0E0"            # колір хвилі під бренд
+  waveform_height: 260
+  default_background: "assets/background_default.png"
+  backgrounds:                            # опційно: свій фон під кожну серію; фолбек — default_background
+    dicepunk: "assets/background_dicepunk.png"
+    d2didiv: "assets/background_d2didiv.png"
+
+youtube:
+  category_id: "24"                      # 24 = Entertainment (уточнити за потреби)
+  privacy_status: "public"               # застосовується у publish; prepare нічого не постить
+  made_for_kids: false
+
+telegram:
+  channel_id: "@dicepunk"                # @username або числовий ID — НЕ url (Telegram Bot API вимагає саме такий формат)
+  parse_mode: "HTML"
+
+claude:
+  model: "claude-sonnet-5"               # дефолт; для макс. якості метаданих можна claude-opus-4-8
+  max_tokens: 4000
+
+transcription:
+  provider: "whisper_api"                # whisper_api | deepgram | faster_whisper_local
+
+transistor:
+  artwork_urls:                          # публічні URL кавер-зображень для episode[image_url]
+    dicepunk: ""                         # Transistor не приймає локальні файли — потрібен хостинг
+    d2didiv: ""
+
+platforms:                               # show-level посилання (фолбек, поки deep link не резолвиться)
+  spotify_show: "https://open.spotify.com/show/6Lo0hwD0ZK2UcHoXZs8neh"
+  apple_show: "https://podcasts.apple.com/pl/podcast/%D0%BE%D0%BB%D0%B5%D0%BA%D1%81%D0%B0%D0%BD%D0%B4%D1%80-%D1%82%D1%80%D1%96%D1%84%D0%B0%D0%BD/id1670763778"
+  amazon_show: "https://music.amazon.com/podcasts/8ff02fea-7a74-4352-9eb7-e8fc4bf3ec5c/%D0%BE%D0%BB%D0%B5%D0%BA%D1%81%D0%B0%D0%BD%D0%B4%D1%80-%D1%82%D1%80%D1%96%D1%84%D0%B0%D0%BD"
+  deezer: "https://www.deezer.com/ru/show/5722897?host=0&deferredFl=1"
