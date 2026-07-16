@@ -110,3 +110,15 @@ class TransistorClient:
         )
         r.raise_for_status()
         return r.json()["data"]
+
+    def schedule_episode(self, episode_id: str, published_at: str) -> dict:
+        """4b) Запланувати на майбутню дату/час замість негайної публікації.
+
+        published_at — "YYYY-MM-DD HH:MM:SS" у таймзоні шоу (формат з доків Transistor).
+        """
+        payload = {"episode[status]": "scheduled", "episode[published_at]": published_at}
+        r = httpx.patch(
+            f"{BASE}/episodes/{episode_id}/publish", data=payload, headers=self._headers, timeout=60
+        )
+        r.raise_for_status()
+        return r.json()["data"]

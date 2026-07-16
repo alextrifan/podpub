@@ -44,11 +44,21 @@ class YouTubeClient:
         description: str,
         tags: list[str],
         privacy_status: str | None = None,
+        publish_at: str | None = None,
     ) -> str:
         from googleapiclient.http import MediaFileUpload
 
         yt = self._service()
         lang = self.config.get("youtube", "language", default="uk")
+        status = {
+            # publishAt працює лише якщо privacyStatus="private" (вимога YouTube API)
+            "privacyStatus": "private"
+            if publish_at
+            else (privacy_status or self.config.get("youtube", "privacy_status", default="public")),
+            "selfDeclaredMadeForKids": bool(self.config.get("youtube", "made_for_kids", default=False)),
+        }
+        if publish_at:
+            status["publishAt"] = publish_at
         body = {
             "snippet": {
                 "title": title,
@@ -58,13 +68,7 @@ class YouTubeClient:
                 "defaultLanguage": lang,
                 "defaultAudioLanguage": lang,
             },
-            "status": {
-                "privacyStatus": privacy_status
-                or self.config.get("youtube", "privacy_status", default="public"),
-                "selfDeclaredMadeForKids": bool(
-                    self.config.get("youtube", "made_for_kids", default=False)
-                ),
-            },
+            "status": status,
         }
         media = MediaFileUpload(video_path, chunksize=-1, resumable=True, mimetype="video/mp4")
         request = yt.videos().insert(part="snippet,status", body=body, media_body=media)

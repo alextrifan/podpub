@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 import typer
@@ -10,12 +11,23 @@ from .extract import extract_games
 from .links import resolve_links
 from .llm import call_claude_text
 from .metadata import generate_metadata
+from .scheduler import schedule_local_command
 from .store import EpisodeStore
 from .telegram import send_message
 from .transcribe import get_transcriber
 from .transistor import TransistorClient
 from .video import render_thumbnail, render_video
 from .youtube import YouTubeClient
+
+SCHEDULE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def _parse_schedule(value: str) -> tuple[datetime, str, str]:
+    """Один локальний час → (datetime, формат для Transistor, ISO8601 UTC для YouTube)."""
+    dt_local = datetime.strptime(value, SCHEDULE_FORMAT).astimezone()
+    transistor_at = dt_local.strftime(SCHEDULE_FORMAT)
+    youtube_at = dt_local.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt_local, transistor_at, youtube_at
 
 app = typer.Typer(add_completion=False, help="Dicepunk / d2 Дідів — podcast publishing pipeline")
 
@@ -159,6 +171,9 @@ def publish(
     youtube_privacy: str = typer.Option(
         "", "--youtube-privacy", help="Override youtube.privacy_status для цього запуску (напр. unlisted)"
     ),
+    schedule: str = typer.Option(
+        "", "--schedule", help="Запланувати на майбутній час замість негайної публікації, напр. '2026-07-20 09:00:00' (локальний час цієї машини)"
+    ),
 ):
     """Публікація на Transistor + YouTube (метадані з metadata.json). Ідемпотентно."""
     cfg = _cfg()
@@ -175,6 +190,10 @@ def publish(
     ep_number = int(episode) if episode.isdigit() else None
     artwork_urls = cfg.get("transistor", "artwork_urls", default={}) or {}
     image_url = artwork_urls.get(series, "")
+
+    transistor_at = youtube_at = ""
+    if schedule:
+        _, transistor_at, youtube_at = _parse_schedule(schedule)
 
     if do_t and not published.get("transistor_id"):
         typer.echo("→ Публікація на Transistor...")
@@ -193,11 +212,14 @@ def publish(
             number=ep_number,
             image_url=image_url,
         )
-        pub = t.publish_episode(ep["id"])
+        pub = t.schedule_episode(ep["id"], transistor_at) if schedule else t.publish_episode(ep["id"])
         published["transistor_id"] = ep["id"]
         published["transistor_url"] = pub.get("attributes", {}).get("share_url", "")
         store.save_json("published.json", published)
-        typer.echo(f"  ✔ Transistor: {published.get('transistor_url', '(без share_url)')}")
+        if schedule:
+            typer.echo(f"  ✔ Transistor: заплановано на {transistor_at}")
+        else:
+            typer.echo(f"  ✔ Transistor: {published.get('transistor_url', '(без share_url)')}")
         if not image_url:
             typer.echo(
                 typer.style(
@@ -218,11 +240,15 @@ def publish(
             ytm["description"],
             ytm.get("tags", []),
             privacy_status=youtube_privacy or None,
+            publish_at=youtube_at or None,
         )
         published["youtube_id"] = vid
         published["youtube_url"] = f"https://youtu.be/{vid}"
         store.save_json("published.json", published)
-        typer.echo(f"  ✔ YouTube: {published['youtube_url']}")
+        if schedule:
+            typer.echo(f"  ✔ YouTube: заплановано на {transistor_at} ({published['youtube_url']})")
+        else:
+            typer.echo(f"  ✔ YouTube: {published['youtube_url']}")
         if store.exists("thumbnail.jpg"):
             y.set_thumbnail(vid, str(store.path("thumbnail.jpg")))
             typer.echo("  ✔ YouTube: обкладинку встановлено")
@@ -236,15 +262,16 @@ def publish(
                 published["transistor_id"], video_url=published["youtube_url"]
             )
             typer.echo("  ✔ Transistor: додано посилання на YouTube-відео")
-        actual_privacy = youtube_privacy or cfg.get("youtube", "privacy_status", default="public")
-        if actual_privacy != "public":
-            typer.echo(
-                typer.style(
-                    f"  ⚠ YouTube-відео опубліковано як {actual_privacy}. Переглянь і тоді:\n"
-                    f"    podpub youtube-go-public --episode {episode}",
-                    fg=typer.colors.YELLOW,
+        if not schedule:
+            actual_privacy = youtube_privacy or cfg.get("youtube", "privacy_status", default="public")
+            if actual_privacy != "public":
+                typer.echo(
+                    typer.style(
+                        f"  ⚠ YouTube-відео опубліковано як {actual_privacy}. Переглянь і тоді:\n"
+                        f"    podpub youtube-go-public --episode {episode}",
+                        fg=typer.colors.YELLOW,
+                    )
                 )
-            )
     elif do_y:
         typer.echo("• YouTube уже опубліковано, пропускаю")
 
@@ -317,6 +344,40 @@ def telegram(
     typer.echo("→ Відправка в Telegram...")
     send_message(store.read_text("telegram.md"), cfg, preview_url=published.get("youtube_url", ""))
     typer.echo("  ✔ Опубліковано в канал")
+
+
+@app.command("schedule-telegram")
+def schedule_telegram(
+    episode: str = typer.Option(..., "--episode"),
+    at: str = typer.Option(..., "--at", help="Локальний час відправки, напр. '2026-07-20 09:00:00'"),
+):
+    """Планує автоматичну відправку вже готового telegram.md на майбутній час (launchd, без sudo).
+
+    Bot API не підтримує заплановані повідомлення — тому це через локальний
+    одноразовий launchd-агент цієї машини (має лишатись увімкненою й розлогіненою
+    з активним GUI-сеансом до моменту спрацювання).
+    """
+    store = EpisodeStore(episode)
+    if not store.exists("telegram.md"):
+        typer.echo(
+            "✗ Немає telegram.md — спершу зроби `podpub telegram --episode "
+            f"{episode}` (без --publish), щоб згенерувати чернетку."
+        )
+        raise typer.Exit(1)
+    dt_local, _, _ = _parse_schedule(at)
+    label = f"fm.podpub.telegram.{episode}"
+    command = (
+        f"cd {ROOT} && source .venv/bin/activate && podpub telegram --episode {episode} --publish"
+    )
+    plist_path = schedule_local_command(label, dt_local, command)
+    typer.echo(
+        typer.style(
+            f"✔ Заплановано відправку episode {episode} на {at}.\n"
+            f"  launchd-агент: {plist_path}\n"
+            f"  (машина має лишатись увімкненою й залогіненою до цього часу)",
+            fg=typer.colors.GREEN,
+        )
+    )
 
 
 @app.command()
