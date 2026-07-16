@@ -34,8 +34,8 @@ transcription:
 
 transistor:
   artwork_urls:                          # публічні URL кавер-зображень для episode[image_url]
-    dicepunk: ""                         # Transistor не приймає локальні файли — потрібен хостинг
-    d2didiv: ""
+    dicepunk: "https://raw.githubusercontent.com/alextrifan/podpub/main/assets/background_dicepunk.png"
+    d2didiv: "https://raw.githubusercontent.com/alextrifan/podpub/main/assets/background_d2didiv.png"
 
 platforms:                               # show-level посилання (фолбек, поки deep link не резолвиться)
   spotify_show: "https://open.spotify.com/show/6Lo0hwD0ZK2UcHoXZs8neh"
