@@ -48,12 +48,15 @@ class YouTubeClient:
         from googleapiclient.http import MediaFileUpload
 
         yt = self._service()
+        lang = self.config.get("youtube", "language", default="uk")
         body = {
             "snippet": {
                 "title": title,
                 "description": description,
                 "tags": tags,
                 "categoryId": str(self.config.get("youtube", "category_id", default="24")),
+                "defaultLanguage": lang,
+                "defaultAudioLanguage": lang,
             },
             "status": {
                 "privacyStatus": privacy_status
@@ -80,3 +83,30 @@ class YouTubeClient:
         yt = self._service()
         media = MediaFileUpload(image_path, mimetype="image/jpeg")
         yt.thumbnails().set(videoId=video_id, media_body=media).execute()
+
+    def _find_or_create_playlist(self, yt, title: str) -> str:
+        request = yt.playlists().list(part="id,snippet", mine=True, maxResults=50)
+        while request is not None:
+            resp = request.execute()
+            for item in resp.get("items", []):
+                if item["snippet"]["title"] == title:
+                    return item["id"]
+            request = yt.playlists().list_next(request, resp)
+        created = yt.playlists().insert(
+            part="snippet,status",
+            body={"snippet": {"title": title}, "status": {"privacyStatus": "public"}},
+        ).execute()
+        return created["id"]
+
+    def add_to_playlist(self, video_id: str, playlist_title: str) -> None:
+        yt = self._service()
+        playlist_id = self._find_or_create_playlist(yt, playlist_title)
+        yt.playlistItems().insert(
+            part="snippet",
+            body={
+                "snippet": {
+                    "playlistId": playlist_id,
+                    "resourceId": {"kind": "youtube#video", "videoId": video_id},
+                }
+            },
+        ).execute()

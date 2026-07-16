@@ -226,6 +226,11 @@ def publish(
         if store.exists("thumbnail.jpg"):
             y.set_thumbnail(vid, str(store.path("thumbnail.jpg")))
             typer.echo("  ✔ YouTube: обкладинку встановлено")
+        playlists_cfg = cfg.get("youtube", "playlists", default={}) or {}
+        playlist_title = playlists_cfg.get(series, "")
+        if playlist_title:
+            y.add_to_playlist(vid, playlist_title)
+            typer.echo(f"  ✔ YouTube: додано у плейлист «{playlist_title}»")
         if published.get("transistor_id"):
             TransistorClient(cfg).update_episode(
                 published["transistor_id"], video_url=published["youtube_url"]
@@ -310,7 +315,7 @@ def telegram(
         return
 
     typer.echo("→ Відправка в Telegram...")
-    send_message(store.read_text("telegram.md"), cfg)
+    send_message(store.read_text("telegram.md"), cfg, preview_url=published.get("youtube_url", ""))
     typer.echo("  ✔ Опубліковано в канал")
 
 
