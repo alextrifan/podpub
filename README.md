@@ -34,8 +34,11 @@ podpub prepare --audio ~/ep042.mp3 --episode 042 --series dicepunk
 #   за потреби відредагуй episodes/042/metadata.json
 #   глянь episodes/042/video.mp4
 
-# STAGE 1b — публікація на Transistor + YouTube
+# STAGE 1b — публікація на Transistor (live) + YouTube (unlisted за замовчуванням — config.youtube.privacy_status)
 podpub publish --episode 042
+
+# → переглянь unlisted відео на YouTube, тоді:
+podpub youtube-go-public --episode 042      # переводить у public, без переаплоаду
 
 # STAGE 2 — Telegram (наступного дня, коли лінки платформ розійшлись)
 podpub telegram --episode 042              # чернетка → episodes/042/telegram.md

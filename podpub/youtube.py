@@ -6,7 +6,10 @@ from .config import Config
 
 # TODO (див. спеку §13): звірити поля snippet/status і вимоги OAuth з актуальними доками.
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube",  # videos.update (privacy) не покривається youtube.upload
+]
 
 
 class YouTubeClient:

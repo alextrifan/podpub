@@ -18,7 +18,7 @@ video:
 
 youtube:
   category_id: "24"                      # 24 = Entertainment (уточнити за потреби)
-  privacy_status: "public"               # застосовується у publish; prepare нічого не постить
+  privacy_status: "unlisted"             # стандартна політика: unlisted при publish, тоді вручну `podpub youtube-go-public`
   made_for_kids: false
 
 telegram:

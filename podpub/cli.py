@@ -231,6 +231,15 @@ def publish(
                 published["transistor_id"], video_url=published["youtube_url"]
             )
             typer.echo("  ✔ Transistor: додано посилання на YouTube-відео")
+        actual_privacy = youtube_privacy or cfg.get("youtube", "privacy_status", default="public")
+        if actual_privacy != "public":
+            typer.echo(
+                typer.style(
+                    f"  ⚠ YouTube-відео опубліковано як {actual_privacy}. Переглянь і тоді:\n"
+                    f"    podpub youtube-go-public --episode {episode}",
+                    fg=typer.colors.YELLOW,
+                )
+            )
     elif do_y:
         typer.echo("• YouTube уже опубліковано, пропускаю")
 
