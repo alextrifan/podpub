@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import httpx
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .config import Config
 
@@ -12,6 +13,8 @@ BASE = "https://api.transistor.fm/v1"
 
 _URL_RE = re.compile(r"(https?://[^\s<]+)")
 _BULLET_PREFIXES = ("—", "•", "-")
+
+_retry = retry(wait=wait_exponential(multiplier=1, min=2, max=30), stop=stop_after_attempt(4))
 
 
 def _linkify(text: str) -> str:
@@ -48,6 +51,7 @@ class TransistorClient:
     def _headers(self) -> dict:
         return {"x-api-key": self.key}
 
+    @_retry
     def authorize_upload(self, filename: str) -> dict:
         """1) Отримати pre-signed URL. Очікувано повертає upload_url + audio_url."""
         r = httpx.get(
@@ -59,12 +63,14 @@ class TransistorClient:
         r.raise_for_status()
         return r.json()["data"]["attributes"]
 
+    @_retry
     def upload_audio(self, upload_url: str, audio_path: str) -> None:
         """2) Залити байти аудіо на pre-signed URL."""
         data = Path(audio_path).read_bytes()
         r = httpx.put(upload_url, content=data, headers={"Content-Type": "audio/mpeg"}, timeout=None)
         r.raise_for_status()
 
+    @_retry
     def create_episode(
         self,
         audio_url: str,
@@ -95,6 +101,7 @@ class TransistorClient:
         r.raise_for_status()
         return r.json()["data"]
 
+    @_retry
     def update_episode(self, episode_id: str, **fields: str) -> dict:
         """PATCH довільних полів епізоду (напр. video_url після завантаження на YouTube)."""
         payload = {f"episode[{k}]": v for k, v in fields.items()}
@@ -102,6 +109,7 @@ class TransistorClient:
         r.raise_for_status()
         return r.json()["data"]
 
+    @_retry
     def publish_episode(self, episode_id: str) -> dict:
         """4) Опублікувати."""
         payload = {"episode[status]": "published"}
@@ -111,6 +119,7 @@ class TransistorClient:
         r.raise_for_status()
         return r.json()["data"]
 
+    @_retry
     def schedule_episode(self, episode_id: str, published_at: str) -> dict:
         """4b) Запланувати на майбутню дату/час замість негайної публікації.
 

@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .config import Config
+from tenacity import retry, stop_after_attempt, wait_exponential
 
-# TODO (див. спеку §13): звірити поля snippet/status і вимоги OAuth з актуальними доками.
+from .config import Config
 
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube",  # videos.update (privacy) не покривається youtube.upload
 ]
+
+# менше спроб і довший backoff, ніж деінде: повторний виклик тут часто означає
+# переаплоад великого відеофайлу, тож не варто ретраїти надто агресивно.
+_retry = retry(wait=wait_exponential(multiplier=2, min=4, max=60), stop=stop_after_attempt(3))
 
 
 class YouTubeClient:
@@ -37,6 +41,7 @@ class YouTubeClient:
             token_path.write_text(creds.to_json(), encoding="utf-8")
         return build("youtube", "v3", credentials=creds)
 
+    @_retry
     def upload_video(
         self,
         video_path: str,
@@ -75,12 +80,14 @@ class YouTubeClient:
         response = request.execute()
         return response["id"]
 
+    @_retry
     def set_privacy(self, video_id: str, privacy_status: str) -> None:
         yt = self._service()
         yt.videos().update(
             part="status", body={"id": video_id, "status": {"privacyStatus": privacy_status}}
         ).execute()
 
+    @_retry
     def set_thumbnail(self, video_id: str, image_path: str) -> None:
         from googleapiclient.http import MediaFileUpload
 
@@ -102,6 +109,7 @@ class YouTubeClient:
         ).execute()
         return created["id"]
 
+    @_retry
     def add_to_playlist(self, video_id: str, playlist_title: str) -> None:
         yt = self._service()
         playlist_id = self._find_or_create_playlist(yt, playlist_title)

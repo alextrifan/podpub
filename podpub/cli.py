@@ -249,18 +249,33 @@ def publish(
             typer.echo(f"  ✔ YouTube: заплановано на {transistor_at} ({published['youtube_url']})")
         else:
             typer.echo(f"  ✔ YouTube: {published['youtube_url']}")
-        if store.exists("thumbnail.jpg"):
+    elif do_y:
+        typer.echo("• YouTube уже опубліковано, пропускаю")
+
+    # Наступні під-кроки — окремо ідемпотентні (кожен зі своїм прапорцем у published.json),
+    # щоб falha в одному з них (напр. тимчасова помилка YouTube API) не пропускала решту
+    # назавжди при повторному запуску, коли youtube_id уже існує.
+    if do_y and published.get("youtube_id"):
+        vid = published["youtube_id"]
+        y = YouTubeClient(cfg)
+        if store.exists("thumbnail.jpg") and not published.get("youtube_thumbnail_set"):
             y.set_thumbnail(vid, str(store.path("thumbnail.jpg")))
+            published["youtube_thumbnail_set"] = True
+            store.save_json("published.json", published)
             typer.echo("  ✔ YouTube: обкладинку встановлено")
         playlists_cfg = cfg.get("youtube", "playlists", default={}) or {}
         playlist_title = playlists_cfg.get(series, "")
-        if playlist_title:
+        if playlist_title and not published.get("youtube_playlist"):
             y.add_to_playlist(vid, playlist_title)
+            published["youtube_playlist"] = playlist_title
+            store.save_json("published.json", published)
             typer.echo(f"  ✔ YouTube: додано у плейлист «{playlist_title}»")
-        if published.get("transistor_id"):
+        if published.get("transistor_id") and not published.get("transistor_video_url_set"):
             TransistorClient(cfg).update_episode(
                 published["transistor_id"], video_url=published["youtube_url"]
             )
+            published["transistor_video_url_set"] = True
+            store.save_json("published.json", published)
             typer.echo("  ✔ Transistor: додано посилання на YouTube-відео")
         if not schedule:
             actual_privacy = youtube_privacy or cfg.get("youtube", "privacy_status", default="public")
@@ -272,8 +287,6 @@ def publish(
                         fg=typer.colors.YELLOW,
                     )
                 )
-    elif do_y:
-        typer.echo("• YouTube уже опубліковано, пропускаю")
 
 
 @app.command("youtube-go-public")
