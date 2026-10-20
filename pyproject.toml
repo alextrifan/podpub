@@ -13,6 +13,9 @@ dependencies = [
     "google-api-python-client>=2.130",
     "google-auth-oauthlib>=1.2",
     "openai>=1.40",            # для provider=whisper_api
+    "fastapi>=0.115",          # веб-інтерфейс (podpub web)
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9", # завантаження аудіо через інтерфейс
 ]
 # Опційно (важкі / за потреби, встанови окремо):
 #   faster-whisper>=1.0       # provider=faster_whisper_local

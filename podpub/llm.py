@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import re
 
+import anthropic
 from anthropic import Anthropic
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 from .config import Config
 
@@ -16,7 +17,17 @@ def _strip_fences(text: str) -> str:
     return text.strip()
 
 
-@retry(wait=wait_exponential(multiplier=1, min=2, max=30), stop=stop_after_attempt(4))
+# Повторюємо лише тимчасові збої: брак кредитів, хибний ключ чи некоректний запит
+# повтором не виправиш — краще одразу показати людині зрозумілу помилку.
+_PERMANENT = (anthropic.BadRequestError, anthropic.AuthenticationError, anthropic.PermissionDeniedError)
+
+
+@retry(
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+    stop=stop_after_attempt(4),
+    retry=retry_if_not_exception_type(_PERMANENT),
+    reraise=True,
+)
 def call_claude_text(system: str, user: str, config: Config) -> str:
     client = Anthropic(api_key=Config.secret("ANTHROPIC_API_KEY"))
     resp = client.messages.create(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable
 
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -17,10 +18,12 @@ _retry = retry(wait=wait_exponential(multiplier=2, min=4, max=60), stop=stop_aft
 
 
 class YouTubeClient:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, notify: Callable[[str, str], None] | None = None):
         self.config = config
+        self.notify = notify
 
-    def _service(self):
+    def _service(self, force_login: bool = False):
+        from google.auth.exceptions import RefreshError
         from google.auth.transport.requests import Request
         from google.oauth2.credentials import Credentials
         from google_auth_oauthlib.flow import InstalledAppFlow
@@ -30,16 +33,30 @@ class YouTubeClient:
         token_path = Path(Config.secret("YOUTUBE_TOKEN_PATH", required=False) or "youtube.token")
 
         creds = None
-        if token_path.exists():
+        if token_path.exists() and not force_login:
             creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
+        if creds and not creds.valid and creds.expired and creds.refresh_token:
+            try:
                 creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(client_secret, SCOPES)
-                creds = flow.run_local_server(port=0)  # одноразова авторизація у браузері
+            except RefreshError:
+                # Протухлий/відкликаний токен (у режимі Testing Google обмежує його 7 днями) —
+                # замість падіння просто проходимо вхід заново.
+                creds = None
+        if not creds or not creds.valid:
+            if self.notify:
+                self.notify(
+                    "Відкриваю вікно входу Google у браузері — підтвердь доступ до YouTube.", "warn"
+                )
+            flow = InstalledAppFlow.from_client_secrets_file(client_secret, SCOPES)
+            creds = flow.run_local_server(port=0)
+            token_path.write_text(creds.to_json(), encoding="utf-8")
+        elif creds.token and token_path.exists():
             token_path.write_text(creds.to_json(), encoding="utf-8")
         return build("youtube", "v3", credentials=creds)
+
+    def login(self) -> None:
+        """Примусовий новий вхід (напр. з кнопки в інтерфейсі)."""
+        self._service(force_login=True)
 
     @_retry
     def upload_video(
