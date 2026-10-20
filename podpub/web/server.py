@@ -94,6 +94,8 @@ def _friendly_error(e: BaseException) -> str:
         )
     if name in ("AuthenticationError", "PermissionDeniedError"):
         return f"Сервіс відхилив API-ключ — перевір ключі у файлі .env. ({text[:200]})"
+    if name == "YouTubeLoginTimeout":
+        return text
     if name == "HttpError":
         return (
             "YouTube тимчасово відповів помилкою. Натисни «Спробувати ще раз» — "

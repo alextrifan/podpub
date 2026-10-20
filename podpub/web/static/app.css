@@ -370,6 +370,7 @@ a.step:hover { border-color: var(--rule-strong); background: var(--raised); }
 .ln.k-info { color: var(--term-dim); }
 .ln.k-ok { color: var(--term-ok); }
 .ln.k-warn { color: var(--term-warn); }
+.ln-link { color: var(--term-warn); font-weight: 700; text-underline-offset: 3px; }
 .job-error { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 14px 16px; background: var(--accent-soft); border-top: 1px solid var(--accent); }
 .job-error p { flex: 1 1 360px; margin: 0; font-weight: 500; }
 .dot { width: 10px; height: 10px; border-radius: 50%; }

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import subprocess
+import webbrowser
 from pathlib import Path
 from typing import Callable
 
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 from .config import Config
 
@@ -12,9 +14,36 @@ SCOPES = [
     "https://www.googleapis.com/auth/youtube",  # videos.update (privacy) не покривається youtube.upload
 ]
 
+LOGIN_TIMEOUT_SECONDS = 15 * 60
+
+
+class YouTubeLoginTimeout(Exception):
+    """Вхід у Google не завершили вчасно — повторювати автоматично немає сенсу."""
+
+
 # менше спроб і довший backoff, ніж деінде: повторний виклик тут часто означає
 # переаплоад великого відеофайлу, тож не варто ретраїти надто агресивно.
-_retry = retry(wait=wait_exponential(multiplier=2, min=4, max=60), stop=stop_after_attempt(3))
+_retry = retry(
+    wait=wait_exponential(multiplier=2, min=4, max=60),
+    stop=stop_after_attempt(3),
+    retry=retry_if_not_exception_type(YouTubeLoginTimeout),
+    reraise=True,
+)
+
+
+class _OpenAndReport(webbrowser.BaseBrowser):
+    """Відкриває посилання входу Google через /usr/bin/open (надійніше за AppleScript,
+    яким Python користується за замовчуванням і помилки якого мовчки ігнорує)
+    і передає посилання в журнал — щоб його можна було відкрити й вручну."""
+
+    def __init__(self, notify: Callable[[str, str], None] | None):
+        super().__init__("podpub-login")
+        self.notify = notify
+
+    def open(self, url: str, new: int = 0, autoraise: bool = True) -> bool:
+        if self.notify:
+            self.notify(url, "link")
+        return subprocess.run(["/usr/bin/open", url], capture_output=True).returncode == 0
 
 
 class YouTubeClient:
@@ -43,12 +72,28 @@ class YouTubeClient:
                 # замість падіння просто проходимо вхід заново.
                 creds = None
         if not creds or not creds.valid:
+            from google_auth_oauthlib.flow import WSGITimeoutError
+
             if self.notify:
                 self.notify(
-                    "Відкриваю вікно входу Google у браузері — підтвердь доступ до YouTube.", "warn"
+                    "Потрібен вхід у Google: відкриваю вікно в браузері. Якщо воно не з'явилося — "
+                    "натисни посилання нижче й підтвердь доступ до YouTube.",
+                    "warn",
                 )
+            webbrowser.register("podpub-login", None, _OpenAndReport(self.notify))
             flow = InstalledAppFlow.from_client_secrets_file(client_secret, SCOPES)
-            creds = flow.run_local_server(port=0)
+            try:
+                creds = flow.run_local_server(
+                    port=0,
+                    browser="podpub-login",
+                    timeout_seconds=LOGIN_TIMEOUT_SECONDS,
+                    authorization_prompt_message="Посилання для входу в Google: {url}",
+                )
+            except WSGITimeoutError:
+                raise YouTubeLoginTimeout(
+                    "Вхід у Google не завершено за 15 хвилин. Натисни «Спробувати ще раз», "
+                    "коли будеш готовий — публікація продовжиться з того ж місця."
+                ) from None
             token_path.write_text(creds.to_json(), encoding="utf-8")
         elif creds.token and token_path.exists():
             token_path.write_text(creds.to_json(), encoding="utf-8")

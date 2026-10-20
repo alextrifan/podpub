@@ -1049,7 +1049,13 @@ function renderJob() {
     if (!jobVisible(j)) {
       slot.innerHTML = "";
     } else {
-      const lines = app.jobLines.map((l) => `<div class="ln k-${esc(l.kind)}">${esc(l.text)}</div>`).join("");
+      const lines = app.jobLines
+        .map((l) =>
+          l.kind === "link" && /^https:\/\//.test(l.text)
+            ? `<div class="ln"><a class="ln-link" href="${esc(l.text)}" target="_blank" rel="noopener">→ Відкрити вхід Google ↗</a></div>`
+            : `<div class="ln k-${esc(l.kind)}">${esc(l.text)}</div>`
+        )
+        .join("");
       const mark =
         j.status === "running" ? `<span class="spinner"></span>` : `<span class="dot ${j.status === "done" ? "ok" : "err"}"></span>`;
       const state = { running: "виконується", done: "готово", error: "зупинилося з помилкою" }[j.status];
