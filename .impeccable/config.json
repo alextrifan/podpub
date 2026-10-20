@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "podpub/web/static/app.css"
+        ],
+        "createdAt": "2026-10-20T17:13:40.353Z",
+        "reason": "Claude: .tg-bubble blockquote mirrors Telegram's own blockquote rendering (left bar) in the post preview; callout side-tabs were fixed separately"
+      }
+    ]
+  }
+}

@@ -219,17 +219,21 @@ a.step:hover { border-color: var(--rule-strong); background: var(--raised); }
 
 /* ── callouts ── */
 .callout {
+  --tone: var(--ink-3);
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px;
-  margin: 16px 0; padding: 16px 18px; border-radius: var(--radius); border-left: 3px solid;
+  margin: 16px 0; padding: 16px 18px; border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--tone) 40%, transparent);
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
 }
 .callout-text { flex: 1 1 340px; }
-.callout-text b { display: block; margin-bottom: 2px; }
+.callout-text b { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.callout-text b::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--tone); }
 .callout-text p { margin: 0; color: var(--ink-2); }
 .callout-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.c-ok { background: var(--sage-soft); border-color: var(--sage); }
-.c-warn { background: var(--warn-soft); border-color: var(--warn); }
-.c-todo { background: var(--accent-soft); border-color: var(--accent); }
-.c-info { background: var(--run-soft); border-color: var(--run); }
+.c-ok { --tone: var(--sage); }
+.c-warn { --tone: var(--warn); }
+.c-todo { --tone: var(--accent); }
+.c-info { --tone: var(--run); }
 
 /* ── prepare checklist ── */
 .checks { list-style: none; margin: 0 0 8px; padding: 0; border-top: 1px solid var(--rule); }
